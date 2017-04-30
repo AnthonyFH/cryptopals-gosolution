@@ -1,20 +1,51 @@
 package cryptohelpers
 
-import "errors"
+import (
+	aes "crypto/aes"
+	"errors"
+)
+
+// DecryptAESECB decrypts encryptedText using AES ECB mode and key. Fails if key
+// is not a valid length for AES or if encryptedText is not a multiple of the AES block size (128 bits).
+func DecryptAESECB(key []byte, encryptedText []byte) ([]byte, error) {
+
+	aesBlock, err := aes.NewCipher(key)
+	if err != nil {
+		return nil, err
+	}
+
+	blockSizeBytes := aesBlock.BlockSize()
+
+	blockCount := len(encryptedText) / blockSizeBytes
+
+	plaintext := make([]byte, 0, len(encryptedText))
+
+	for i := 0; i < blockCount; i++ {
+		decryptedBlock := make([]byte, blockSizeBytes, blockSizeBytes)
+		aesBlock.Decrypt(decryptedBlock, encryptedText[i*blockSizeBytes:(i+1)*blockSizeBytes])
+		plaintext = append(plaintext, decryptedBlock...)
+	}
+
+	// Remove padding (see rfc5652 for padding definition)
+	paddingBytes := int(plaintext[len(plaintext)-1])
+	plaintext = plaintext[:len(plaintext)-paddingBytes]
+
+	return plaintext, nil
+}
 
 // HammingDistanceOfFirstChunks takes the first two chunks of size keysize of bChiper and computes their Hamming Distance
 func HammingDistanceOfFirstChunks(bCipher []byte, keySize int) (int, error) {
-    if len(bCipher) < 2*keySize {
-        return -1, errors.New("bCipher is too short")
-    }
-    byteSlice1 := bCipher[0:keySize]
-    byteSlice2 := bCipher[keySize : 2*keySize]
-    byteSlice3 := bCipher[2*keySize : 3*keySize]
+	if len(bCipher) < 2*keySize {
+		return -1, errors.New("bCipher is too short")
+	}
+	byteSlice1 := bCipher[0:keySize]
+	byteSlice2 := bCipher[keySize : 2*keySize]
+	byteSlice3 := bCipher[2*keySize : 3*keySize]
 
-    res1, _ := HammingDistance(byteSlice1, byteSlice2)
-    res2, _ := HammingDistance(byteSlice2, byteSlice3)
+	res1, _ := HammingDistance(byteSlice1, byteSlice2)
+	res2, _ := HammingDistance(byteSlice2, byteSlice3)
 
-    return res1 + res2, nil
+	return res1 + res2, nil
 }
 
 // HammingDistance computes the Hamming Distance between two different byte slices of equal length.
