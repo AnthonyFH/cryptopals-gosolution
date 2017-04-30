@@ -16,6 +16,10 @@ func DecryptAESECB(key []byte, encryptedText []byte) ([]byte, error) {
 
 	blockSizeBytes := aesBlock.BlockSize()
 
+	if len(encryptedText)%blockSizeBytes != 0 {
+		return nil, errors.New("encryptedText not a multiple of block size")
+	}
+
 	blockCount := len(encryptedText) / blockSizeBytes
 
 	plaintext := make([]byte, 0, len(encryptedText))
