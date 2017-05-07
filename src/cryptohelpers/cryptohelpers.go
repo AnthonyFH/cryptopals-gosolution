@@ -124,7 +124,7 @@ func ByteXor(byteSlice []byte, xorByte byte) error {
 	return nil
 }
 
-// FixedXor takes to bytes and xor's them together, returning the result.
+// FixedXor takes two bytes and xor's them together, returning the result.
 func FixedXor(byte1, byte2 []byte) ([]byte, error) {
 
 	result := make([]byte, len(byte1), len(byte1))
