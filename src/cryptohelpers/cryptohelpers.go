@@ -30,11 +30,24 @@ func DecryptAESECB(key []byte, encryptedText []byte) ([]byte, error) {
 		plaintext = append(plaintext, decryptedBlock...)
 	}
 
-	// Remove padding (see rfc5652 for padding definition)
+	// Remove padding (see RFC 2315 for padding definition)
 	paddingBytes := int(plaintext[len(plaintext)-1])
 	plaintext = plaintext[:len(plaintext)-paddingBytes]
 
 	return plaintext, nil
+}
+
+// AppendPadding takes a byte slice and a block size returns a byte slice with
+// appended padding so that its length is an even multiple of the block size
+func AppendPadding(message []byte, blockSize int) ([]byte, error) {
+	remainder := len(message) % blockSize
+	paddingLength := blockSize - remainder
+	paddingValue := byte(paddingLength)
+	for i := 0; i < paddingLength; i++ {
+		message = append(message, paddingValue)
+	}
+
+	return message, nil
 }
 
 // HammingDistanceOfFirstChunks takes the first two chunks of size keysize of bChiper and computes their Hamming Distance
