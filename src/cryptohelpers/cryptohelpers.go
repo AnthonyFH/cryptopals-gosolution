@@ -5,6 +5,93 @@ import (
 	"errors"
 )
 
+// EncryptAESCBC encrypts messages using AES with the given key using CBC
+// mode with the given initialization vector (iv)
+func EncryptAESCBC(key []byte, iv []byte, message []byte) ([]byte, error) {
+	aesBlock, err := aes.NewCipher(key)
+	if err != nil {
+		return nil, err
+	}
+
+	blockSizeBytes := aesBlock.BlockSize()
+
+	message, err = AppendPadding(message, blockSizeBytes)
+	if err != nil {
+		return nil, err
+	}
+
+	encryptedMessage := make([]byte, 0, len(message))
+
+	if len(iv) != blockSizeBytes {
+		return nil, errors.New("Initialization vector has incorrect length")
+	}
+
+	previousBlockResult := iv
+	for i := 0; i < len(message); i += blockSizeBytes {
+		blockInput, err := FixedXor(previousBlockResult, message[i:i+blockSizeBytes])
+		if err != nil {
+			return nil, err
+		}
+
+		blockOutput := make([]byte, blockSizeBytes)
+
+		aesBlock.Encrypt(blockOutput, blockInput)
+
+		previousBlockResult = blockOutput
+
+		encryptedMessage = append(encryptedMessage, blockOutput...)
+	}
+
+	return encryptedMessage, nil
+}
+
+// DecryptAESCBC decrypts messages using AES with the given key using CBC
+// mode with the given initialization vector (iv)
+func DecryptAESCBC(key []byte, iv []byte, encryptedMessage []byte) ([]byte, error) {
+	aesBlock, err := aes.NewCipher(key)
+	if err != nil {
+		return nil, err
+	}
+
+	blockSizeBytes := aesBlock.BlockSize()
+
+	decryptedMessage := make([]byte, 0, len(encryptedMessage))
+
+	if len(iv) != blockSizeBytes {
+		return nil, errors.New("Initialization vector has incorrect length")
+	}
+
+	if len(encryptedMessage)%blockSizeBytes != 0 {
+		return nil, errors.New("len(encryptedMessage) is ")
+	}
+
+	previousCipher := iv
+	for i := 0; i < len(encryptedMessage); i += blockSizeBytes {
+		blockInput := encryptedMessage[i : i+blockSizeBytes]
+
+		blockOutput := make([]byte, blockSizeBytes)
+
+		xorValue := previousCipher
+		previousCipher = blockInput
+
+		aesBlock.Decrypt(blockOutput, blockInput)
+
+		blockOutput, err = FixedXor(xorValue, blockOutput)
+		if err != nil {
+			return nil, err
+		}
+
+		decryptedMessage = append(decryptedMessage, blockOutput...)
+	}
+
+	decryptedMessage, err = RemovePadding(decryptedMessage)
+	if err != nil {
+		return nil, err
+	}
+
+	return decryptedMessage, nil
+}
+
 // DecryptAESECB decrypts encryptedText using AES ECB mode and key. Fails if key
 // is not a valid length for AES or if encryptedText is not a multiple of the AES block size (128 bits).
 func DecryptAESECB(key []byte, encryptedText []byte) ([]byte, error) {
@@ -30,9 +117,10 @@ func DecryptAESECB(key []byte, encryptedText []byte) ([]byte, error) {
 		plaintext = append(plaintext, decryptedBlock...)
 	}
 
-	// Remove padding (see RFC 2315 for padding definition)
-	paddingBytes := int(plaintext[len(plaintext)-1])
-	plaintext = plaintext[:len(plaintext)-paddingBytes]
+	plaintext, err = RemovePadding(plaintext)
+	if err != nil {
+		return nil, err
+	}
 
 	return plaintext, nil
 }
@@ -46,6 +134,15 @@ func AppendPadding(message []byte, blockSize int) ([]byte, error) {
 	for i := 0; i < paddingLength; i++ {
 		message = append(message, paddingValue)
 	}
+
+	return message, nil
+}
+
+// RemovePadding takes a mesage and returns that message without
+// padding as defined in RFC 2315
+func RemovePadding(message []byte) ([]byte, error) {
+	paddingBytes := int(message[len(message)-1])
+	message = message[:len(message)-paddingBytes]
 
 	return message, nil
 }
@@ -124,7 +221,7 @@ func ByteXor(byteSlice []byte, xorByte byte) error {
 	return nil
 }
 
-// FixedXor takes two bytes and xor's them together, returning the result.
+// FixedXor takes two byte slices and xor's them together, returning the result.
 func FixedXor(byte1, byte2 []byte) ([]byte, error) {
 
 	result := make([]byte, len(byte1), len(byte1))
