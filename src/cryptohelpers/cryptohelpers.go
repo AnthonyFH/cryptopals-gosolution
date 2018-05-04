@@ -3,6 +3,7 @@ package cryptohelpers
 import (
 	aes "crypto/aes"
 	"errors"
+	"math/rand"
 )
 
 // EncryptAESCBC encrypts messages using AES with the given key using CBC
@@ -109,20 +110,49 @@ func DecryptAESECB(key []byte, encryptedText []byte) ([]byte, error) {
 
 	blockCount := len(encryptedText) / blockSizeBytes
 
-	plaintext := make([]byte, 0, len(encryptedText))
+	plainText := make([]byte, 0, len(encryptedText))
 
 	for i := 0; i < blockCount; i++ {
 		decryptedBlock := make([]byte, blockSizeBytes, blockSizeBytes)
 		aesBlock.Decrypt(decryptedBlock, encryptedText[i*blockSizeBytes:(i+1)*blockSizeBytes])
-		plaintext = append(plaintext, decryptedBlock...)
+		plainText = append(plainText, decryptedBlock...)
 	}
 
-	plaintext, err = RemovePadding(plaintext)
+	plainText, err = RemovePadding(plainText)
 	if err != nil {
 		return nil, err
 	}
 
-	return plaintext, nil
+	return plainText, nil
+}
+
+// EncryptAESECB encrypts message using AES ECB mode and key. Fails if key
+// is not a valid length for AES.
+func EncryptAESECB(key []byte, message []byte) ([]byte, error) {
+
+	aesBlock, err := aes.NewCipher(key)
+	if err != nil {
+		return nil, err
+	}
+
+	blockSizeBytes := aesBlock.BlockSize()
+
+	blockCount := len(message) / blockSizeBytes
+
+	cipher := make([]byte, 0, len(message))
+
+	for i := 0; i < blockCount; i++ {
+		encryptedBlock := make([]byte, blockSizeBytes, blockSizeBytes)
+		aesBlock.Encrypt(encryptedBlock, message[i*blockSizeBytes:(i+1)*blockSizeBytes])
+		cipher = append(cipher, encryptedBlock...)
+	}
+
+	cipher, err = AppendPadding(cipher, blockSizeBytes)
+	if err != nil {
+		return nil, err
+	}
+
+	return cipher, nil
 }
 
 // AppendPadding takes a byte slice and a block size returns a byte slice with
@@ -308,4 +338,38 @@ func BreakSingleByteXor(cipher []byte) (byte, error) {
 	}
 
 	return index, nil
+}
+
+// CBCECBEncryptionOracle encrypts the input plainText using either CBC or ECB (selected at random)
+// with a random key (and IV in case of ECB). Appends and prepends 5-10 random bytes.
+func CBCECBEncryptionOracle(plainText []byte) ([]byte, int, error) {
+	prependByteCount := (rand.Int() % 5) + 5
+	prependBytes := make([]byte, prependByteCount)
+	rand.Read(prependBytes)
+
+	appendByteCount := (rand.Int() % 5) + 5
+	appendBytes := make([]byte, appendByteCount)
+	rand.Read(appendBytes)
+
+	keyByteCount := 16
+	key := make([]byte, keyByteCount)
+	rand.Read(key)
+
+	ivByteCount := aes.BlockSize
+	iv := make([]byte, ivByteCount)
+	rand.Read(iv)
+
+	plainTextNew := append(prependBytes, plainText...)
+	plainTextNew = append(plainTextNew, appendBytes...)
+
+	randInt := rand.Int() % 2
+
+	if randInt == 0 {
+		byteSlice, err := EncryptAESCBC(key, iv, plainTextNew)
+		return byteSlice, randInt, err
+
+	} else {
+		byteSlice, err := EncryptAESECB(key, plainTextNew)
+		return byteSlice, randInt, err
+	}
 }
