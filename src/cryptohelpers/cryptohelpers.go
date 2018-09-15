@@ -3,6 +3,7 @@ package cryptohelpers
 import (
 	aes "crypto/aes"
 	"errors"
+	"fmt"
 	"math/rand"
 )
 
@@ -342,7 +343,7 @@ func BreakSingleByteXor(cipher []byte) (byte, error) {
 
 // CBCECBEncryptionOracle encrypts the input plainText using either CBC or ECB (selected at random)
 // with a random key (and IV in case of ECB). Appends and prepends 5-10 random bytes.
-func CBCECBEncryptionOracle(plainText []byte) ([]byte, int, error) {
+func CBCECBEncryptionOracle(plainText []byte) ([]byte, error) {
 	prependByteCount := (rand.Int() % 5) + 5
 	prependBytes := make([]byte, prependByteCount)
 	rand.Read(prependBytes)
@@ -365,11 +366,45 @@ func CBCECBEncryptionOracle(plainText []byte) ([]byte, int, error) {
 	randInt := rand.Int() % 2
 
 	if randInt == 0 {
+		fmt.Println("Oracle: CBC")
 		byteSlice, err := EncryptAESCBC(key, iv, plainTextNew)
-		return byteSlice, randInt, err
-
+		return byteSlice, err
 	} else {
+		fmt.Println("Oracle: ECB")
 		byteSlice, err := EncryptAESECB(key, plainTextNew)
-		return byteSlice, randInt, err
+		return byteSlice, err
 	}
+}
+
+// IsECB takes an encryption function and outputs
+// whether or not the function is using ECB
+func IsECB(encryptionFunc func([]byte) ([]byte, error)) (bool, error) {
+
+	plainText := []byte("\x00")
+
+	// We need a buffer of 16 bytes to consume the first block.
+	// The encryption function will add at least 5 bytes, so we need
+	// another 11 and we already have one so just append 10 more.
+	//
+	// Then append the plaintext we will use to compare in the second and third
+	// block to see if this is ECB.
+	for i := 0; i < 10+(aes.BlockSize*2); i++ {
+		plainText = append(plainText, '\x00')
+	}
+
+	cipherText, err := encryptionFunc(plainText)
+	if err != nil {
+		return false, errors.New("Error with encryption oracle")
+	}
+
+	// Default to guessing ECB. If the two blocks in the middle do not match, this is CBC.
+	isECB := true
+	for i := 0; i < aes.BlockSize; i++ {
+		if cipherText[aes.BlockSize+i] != cipherText[aes.BlockSize*2+i] {
+			isECB = false
+			break
+		}
+	}
+
+	return isECB, nil
 }
