@@ -138,6 +138,8 @@ func EncryptAESECB(key []byte, message []byte) ([]byte, error) {
 
 	blockSizeBytes := aesBlock.BlockSize()
 
+	message, err = AppendPadding(message, blockSizeBytes)
+
 	blockCount := len(message) / blockSizeBytes
 
 	cipher := make([]byte, 0, len(message))
@@ -146,11 +148,6 @@ func EncryptAESECB(key []byte, message []byte) ([]byte, error) {
 		encryptedBlock := make([]byte, blockSizeBytes, blockSizeBytes)
 		aesBlock.Encrypt(encryptedBlock, message[i*blockSizeBytes:(i+1)*blockSizeBytes])
 		cipher = append(cipher, encryptedBlock...)
-	}
-
-	cipher, err = AppendPadding(cipher, blockSizeBytes)
-	if err != nil {
-		return nil, err
 	}
 
 	return cipher, nil
@@ -382,13 +379,9 @@ func IsECB(encryptionFunc func([]byte) ([]byte, error)) (bool, error) {
 
 	plainText := []byte("\x00")
 
-	// We need a buffer of 16 bytes to consume the first block.
-	// The encryption function will add at least 5 bytes, so we need
-	// another 11 and we already have one so just append 10 more.
-	//
-	// Then append the plaintext we will use to compare in the second and third
-	// block to see if this is ECB.
-	for i := 0; i < 10+(aes.BlockSize*2); i++ {
+	// Decide how many bytes we need to input to the function to be sure the middle is what we should look at.
+	lengthOfInput := 1000
+	for i := 0; i < lengthOfInput; i++ {
 		plainText = append(plainText, '\x00')
 	}
 
@@ -397,10 +390,12 @@ func IsECB(encryptionFunc func([]byte) ([]byte, error)) (bool, error) {
 		return false, errors.New("Error with encryption oracle")
 	}
 
-	// Default to guessing ECB. If the two blocks in the middle do not match, this is CBC.
+	// Default to guessing ECB. If the two blocks in the middle do not match, this is not ECB.
 	isECB := true
 	for i := 0; i < aes.BlockSize; i++ {
-		if cipherText[aes.BlockSize+i] != cipherText[aes.BlockSize*2+i] {
+		index1 := (len(cipherText) / 2) + i
+		index2 := (len(cipherText) / 2) + i + aes.BlockSize
+		if cipherText[index1] != cipherText[index2] {
 			isECB = false
 			break
 		}

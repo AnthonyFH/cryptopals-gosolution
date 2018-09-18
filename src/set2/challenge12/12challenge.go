@@ -47,7 +47,7 @@ func main() {
 
 	// Loop until the output changes size twice
 	for blockSize == 0 {
-		plainTextBytes = append(plainTextBytes, byte(0))
+		plainTextBytes = append(plainTextBytes, byte('\x00'))
 		cipherTextBytes1, err := appendingOracle(plainTextBytes)
 		if err != nil {
 			fmt.Printf("appendingOracle invocation error: %v\n", err)
@@ -63,12 +63,27 @@ func main() {
 		}
 
 		cipherTextBytes = cipherTextBytes1
-
-		fmt.Println(cipherTextBytes)
-
+		fmt.Printf("cipher: %v\n", cipherTextBytes)
 	}
 
 	fmt.Printf("changedSize: %v\n", changedSize)
 	fmt.Printf("blockSize: %v\n", blockSize)
+
+	// Figure out if it's ECB
+	isECB, err := ch.IsECB(appendingOracle)
+
+	if isECB {
+		fmt.Println("YEP, ECB")
+	} else {
+		fmt.Println("NOPE, NOT ECB")
+	}
+
+	// Craft an input one byte short of a block
+	plainTextBytes = []byte("\x00")
+	for i := 0; i < blockSize-1; i++ {
+		plainTextBytes = append(plainTextBytes, byte('\x00'))
+	}
+
+	cipherTextBytes, err = appendingOracle(plainTextBytes)
 
 }
