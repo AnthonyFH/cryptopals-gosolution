@@ -20,38 +20,25 @@ func decipherNextByte(plainTextSoFar []byte, blockSizeBytes int, encryptionFunc 
 	// We need bytes one less than a block when appended to the plainTextSoFar
 	bytesNeeded := blockSizeBytes - (len(plainTextSoFar) % blockSizeBytes) - 1
 
-	fmt.Printf("bytes needed: %v\n", bytesNeeded)
-
 	plainTextBytesRoot := make([]byte, 0)
 
 	for i := 0; i < bytesNeeded; i++ {
 		plainTextBytesRoot = append(plainTextBytesRoot, byte('\x00'))
 	}
 
-	fmt.Printf("plainTextBytesRoot: %v\n", plainTextBytesRoot)
-	actualPlainTextBytes := append(plainTextBytesRoot, plainTextSoFar...)
-
-	fmt.Printf("length of actualPlainTextBytes: %v\n", len(actualPlainTextBytes))
-
 	actualCipherTextBytes, err := appendingOracle(plainTextBytesRoot)
 	if err != nil {
 		return nil, fmt.Errorf("appendingOracle invocation error: %v", err)
 	}
-
-	//fmt.Printf("actualCipherTextBytes: %v\n", actualCipherTextBytes)
 
 	var outputBlocks [256][]byte
 	testPlainTextBytesInput := append(plainTextBytesRoot, plainTextSoFar...)
 	testPlainTextBytesInput = append(testPlainTextBytesInput, byte(0)) // start out with a value of 0 at the end
 	testPlainTextBytesInput = testPlainTextBytesInput[blockSizeBytes*fullBlocksDeciphered : blockSizeBytes*(fullBlocksDeciphered+1)]
 
-	//fmt.Printf("testPlainTextBytesInput: %v\n", testPlainTextBytesInput)
-
 	for i := 0; i < 256; i++ {
 		testPlainTextBytesInput[blockSizeBytes-1] = byte(i)
-		//fmt.Printf("Input: %v\n", testPlainTextBytesInput)
 		outputBlocks[i], err = appendingOracle(testPlainTextBytesInput)
-		//fmt.Printf("Output with index %v : %v\n", i, outputBlocks[i])
 		if err != nil {
 			return nil, fmt.Errorf("appendingOracle invocation error: %v", err)
 		}
@@ -68,10 +55,6 @@ func decipherNextByte(plainTextSoFar []byte, blockSizeBytes int, encryptionFunc 
 			}
 		}
 	}
-
-	fmt.Printf("matchIndex: %v\n", matchIndex)
-	//fmt.Printf("cipherTextBytes: %v\n", actualCipherTextBytes)
-	//fmt.Printf("outputBlocks matching block: %v\n", outputBlocks[matchIndex])
 
 	if matchIndex == -1 {
 		panic(errors.New("did not find a match"))
@@ -159,11 +142,6 @@ func main() {
 		if err == nil {
 			finished = true
 		}
-
-		//decipheredString := string(decipheredPlainTextBytes)
-
-		//fmt.Printf("decipheredString: %v\n", decipheredString)
-		//fmt.Printf("Length of decipheredBytes: %v\n", len(decipheredPlainTextBytes))
 	}
 
 	decipheredPlainTextBytes, err = ch.RemovePadding(decipheredPlainTextBytes)
