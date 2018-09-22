@@ -38,13 +38,14 @@ func decipherNextByte(plainTextSoFar []byte, blockSizeBytes int, encryptionFunc 
 		return nil, fmt.Errorf("appendingOracle invocation error: %v", err)
 	}
 
-	fmt.Printf("actualCipherTextBytes: %v\n", actualCipherTextBytes)
+	//fmt.Printf("actualCipherTextBytes: %v\n", actualCipherTextBytes)
 
 	var outputBlocks [256][]byte
-	testPlainTextBytesInput := append(plainTextBytesRoot, plainTextSoFar[fullBlocksDeciphered*blockSizeBytes:]...)
+	testPlainTextBytesInput := append(plainTextBytesRoot, plainTextSoFar...)
 	testPlainTextBytesInput = append(testPlainTextBytesInput, byte(0)) // start out with a value of 0 at the end
+	testPlainTextBytesInput = testPlainTextBytesInput[blockSizeBytes*fullBlocksDeciphered : blockSizeBytes*(fullBlocksDeciphered+1)]
 
-	fmt.Printf("testPlainTextBytesInput: %v\n", testPlainTextBytesInput)
+	//fmt.Printf("testPlainTextBytesInput: %v\n", testPlainTextBytesInput)
 
 	for i := 0; i < 256; i++ {
 		testPlainTextBytesInput[blockSizeBytes-1] = byte(i)
@@ -150,14 +151,23 @@ func main() {
 	}
 
 	decipheredPlainTextBytes := make([]byte, 0)
+	finished := false
 
-	for i := 0; i < 32; i++ {
+	for finished == false {
 		decipheredPlainTextBytes, err = decipherNextByte(decipheredPlainTextBytes, blockSizeBytes, appendingOracle)
+		_, err := ch.RemovePadding(decipheredPlainTextBytes)
+		if err == nil {
+			finished = true
+		}
 
-		decipheredString := string(decipheredPlainTextBytes)
+		//decipheredString := string(decipheredPlainTextBytes)
 
-		fmt.Printf("decipheredString: %v\n", decipheredString)
-		fmt.Printf("Length of decipheredBytes: %v\n", len(decipheredPlainTextBytes))
+		//fmt.Printf("decipheredString: %v\n", decipheredString)
+		//fmt.Printf("Length of decipheredBytes: %v\n", len(decipheredPlainTextBytes))
 	}
 
+	decipheredPlainTextBytes, err = ch.RemovePadding(decipheredPlainTextBytes)
+
+	decipheredString := string(decipheredPlainTextBytes)
+	fmt.Printf("decipheredString: %v\n", decipheredString)
 }

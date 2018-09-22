@@ -170,6 +170,13 @@ func AppendPadding(message []byte, blockSize int) ([]byte, error) {
 // padding as defined in RFC 2315
 func RemovePadding(message []byte) ([]byte, error) {
 	paddingBytes := int(message[len(message)-1])
+
+	for i := 1; i <= paddingBytes; i++ {
+		if i == len(message) || message[len(message)-i] != byte(paddingBytes) {
+			return nil, errors.New("Invalid padding")
+		}
+	}
+
 	message = message[:len(message)-paddingBytes]
 
 	return message, nil
