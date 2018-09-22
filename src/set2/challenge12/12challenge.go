@@ -15,14 +15,7 @@ var superSecretKey []byte
 // It assumes that encryptionFunc is a function that encrypts the input prepended to some unknown and static text.
 func decipherNextByte(plainTextSoFar []byte, blockSizeBytes int, encryptionFunc func([]byte) ([]byte, error)) ([]byte, error) {
 
-	/*
-		 Plan:
-			DONE 1) Make this work for the first byte only
-			2) Make it work for a whole block
-			3) Make it work for multiple blocks
-	*/
-
-	//fullBlocksDeciphered := len(plainTextSoFar) / blockSizeBytes
+	fullBlocksDeciphered := len(plainTextSoFar) / blockSizeBytes
 
 	// We need bytes one less than a block when appended to the plainTextSoFar
 	bytesNeeded := blockSizeBytes - (len(plainTextSoFar) % blockSizeBytes) - 1
@@ -35,17 +28,23 @@ func decipherNextByte(plainTextSoFar []byte, blockSizeBytes int, encryptionFunc 
 		plainTextBytesRoot = append(plainTextBytesRoot, byte('\x00'))
 	}
 
+	fmt.Printf("plainTextBytesRoot: %v\n", plainTextBytesRoot)
 	actualPlainTextBytes := append(plainTextBytesRoot, plainTextSoFar...)
 
 	fmt.Printf("length of actualPlainTextBytes: %v\n", len(actualPlainTextBytes))
 
-	actualCipherTextBytes, err := appendingOracle(actualPlainTextBytes)
+	actualCipherTextBytes, err := appendingOracle(plainTextBytesRoot)
 	if err != nil {
 		return nil, fmt.Errorf("appendingOracle invocation error: %v", err)
 	}
 
+	fmt.Printf("actualCipherTextBytes: %v\n", actualCipherTextBytes)
+
 	var outputBlocks [256][]byte
-	testPlainTextBytesInput := append(plainTextBytesRoot, byte(0)) // start out with a value of 0 at the end
+	testPlainTextBytesInput := append(plainTextBytesRoot, plainTextSoFar[fullBlocksDeciphered*blockSizeBytes:]...)
+	testPlainTextBytesInput = append(testPlainTextBytesInput, byte(0)) // start out with a value of 0 at the end
+
+	fmt.Printf("testPlainTextBytesInput: %v\n", testPlainTextBytesInput)
 
 	for i := 0; i < 256; i++ {
 		testPlainTextBytesInput[blockSizeBytes-1] = byte(i)
@@ -61,7 +60,7 @@ func decipherNextByte(plainTextSoFar []byte, blockSizeBytes int, encryptionFunc 
 	matchIndex := -1
 	for i := 1; i < 256 && matchIndex == -1; i++ {
 		for j := 0; j < blockSizeBytes; j++ {
-			if outputBlocks[i][j] != actualCipherTextBytes[j] {
+			if outputBlocks[i][j] != actualCipherTextBytes[j+(blockSizeBytes*fullBlocksDeciphered)] {
 				break
 			} else if j == blockSizeBytes-1 {
 				matchIndex = i
@@ -73,8 +72,8 @@ func decipherNextByte(plainTextSoFar []byte, blockSizeBytes int, encryptionFunc 
 	//fmt.Printf("cipherTextBytes: %v\n", actualCipherTextBytes)
 	//fmt.Printf("outputBlocks matching block: %v\n", outputBlocks[matchIndex])
 
-	if matchIndex != -1 {
-		return nil, errors.New("did not find a match")
+	if matchIndex == -1 {
+		panic(errors.New("did not find a match"))
 	}
 
 	plainTextSoFar = append(plainTextSoFar, byte(matchIndex))
@@ -152,7 +151,13 @@ func main() {
 
 	decipheredPlainTextBytes := make([]byte, 0)
 
-	decipheredPlainTextBytes, err = decipherNextByte(decipheredPlainTextBytes, blockSizeBytes, appendingOracle)
-	decipheredPlainTextBytes, err = decipherNextByte(decipheredPlainTextBytes, blockSizeBytes, appendingOracle)
-	decipheredPlainTextBytes, err = decipherNextByte(decipheredPlainTextBytes, blockSizeBytes, appendingOracle)
+	for i := 0; i < 32; i++ {
+		decipheredPlainTextBytes, err = decipherNextByte(decipheredPlainTextBytes, blockSizeBytes, appendingOracle)
+
+		decipheredString := string(decipheredPlainTextBytes)
+
+		fmt.Printf("decipheredString: %v\n", decipheredString)
+		fmt.Printf("Length of decipheredBytes: %v\n", len(decipheredPlainTextBytes))
+	}
+
 }
