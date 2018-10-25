@@ -21,7 +21,6 @@ func parseProfile(profile string) (map[string]string, error) {
 
 	readingProp := true // are we currently reading a property or a value?
 	for i := 0; i < len(profile); i++ {
-		fmt.Printf("Character: %v\n", string(profile[i]))
 		if readingProp {
 			switch profile[i] {
 			case '=':
@@ -57,12 +56,32 @@ func parseProfile(profile string) (map[string]string, error) {
 	return result, nil
 }
 
-func profileFor(email: string) {
-	// TODO fill in profilFor and add documentation
+func profileFor(email string) string {
+	profile := make(map[string]string)
+
+	profile["email"] = email
+	profile["id"] = "10"
+	profile["role"] = "user"
+
+	var resultBuilder strings.Builder
+	resultBuilder.Reset()
+
+	for property, value := range profile {
+		resultBuilder.WriteString(property)
+		resultBuilder.WriteString("=")
+		resultBuilder.WriteString(value)
+		resultBuilder.WriteString("&")
+	}
+
+	result := resultBuilder.String()
+
+	result = strings.TrimSuffix(result, "&")
+
+	return result
 }
 
 func main() {
-	myMap, _ := parseProfile("abc=def&foo=bar")
+	myMap, _ := parseProfile(profileFor("testemail@mydomain.com"))
 
 	fmt.Printf("map: %v\n", myMap)
 }
