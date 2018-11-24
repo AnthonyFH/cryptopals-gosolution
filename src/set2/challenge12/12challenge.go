@@ -2,6 +2,7 @@ package main
 
 import (
 	"crypto/rand"
+	ca "cryptoattackers"
 	ch "cryptohelpers"
 	"encoding/base64"
 	"errors"
@@ -90,38 +91,11 @@ func appendingOracle(plainText []byte) ([]byte, error) {
 
 func main() {
 
-	plainTextBytes := []byte("\x00")
-
-	blockSizeBytes := 0
-	hasChanged := false
-	changedSize := 0
-
-	cipherTextBytes, err := appendingOracle(plainTextBytes)
+	blockSizeBytes, err := ca.DetermineBlockSize(appendingOracle)
 	if err != nil {
 		fmt.Printf("appendingOracle invocation error: %v\n", err)
 	}
 
-	// Loop until the output changes size twice
-	for blockSizeBytes == 0 {
-		plainTextBytes = append(plainTextBytes, byte('\x00'))
-		cipherTextBytes1, err := appendingOracle(plainTextBytes)
-		if err != nil {
-			fmt.Printf("appendingOracle invocation error: %v\n", err)
-		}
-
-		if len(cipherTextBytes) != len(cipherTextBytes1) {
-			if hasChanged {
-				blockSizeBytes = len(cipherTextBytes1) - changedSize
-			} else {
-				hasChanged = true
-				changedSize = len(cipherTextBytes1)
-			}
-		}
-
-		cipherTextBytes = cipherTextBytes1
-	}
-
-	fmt.Printf("changedSize: %v\n", changedSize)
 	fmt.Printf("blockSizeBytes: %v\n", blockSizeBytes)
 
 	// Figure out if it's ECB

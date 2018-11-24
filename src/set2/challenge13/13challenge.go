@@ -1,6 +1,9 @@
 package main
 
 import (
+	"crypto/rand"
+	ca "cryptoattackers"
+	ch "cryptohelpers"
 	"fmt"
 	"strings"
 )
@@ -56,7 +59,9 @@ func parseProfile(profile string) (map[string]string, error) {
 	return result, nil
 }
 
-func profileFor(email string) string {
+// profileFor takes a users email and returns
+// its profile encoded as email=<email>&prop2=bar&...
+func profileFor(email string) (string, error) {
 	profile := make(map[string]string)
 
 	profile["email"] = email
@@ -77,11 +82,37 @@ func profileFor(email string) string {
 
 	result = strings.TrimSuffix(result, "&")
 
-	return result
+	return result, nil
+}
+
+func getEncryptedProfile(profile string) ([]byte, error) {
+	// Generate a random key if needed
+	if superSecretKey == nil {
+		fmt.Println("GENERATED KEY")
+		keyByteCount := 16
+		superSecretKey = make([]byte, keyByteCount)
+		rand.Read(superSecretKey)
+	}
+
+	cipher, err := ch.EncryptAESECB(superSecretKey, []byte(profile))
+	if err != nil {
+		panic(err)
+	}
+
+	return cipher, nil
 }
 
 func main() {
-	myMap, _ := parseProfile(profileFor("testemail@mydomain.com"))
+	// TODO undefined: err (say what?!)
+	blockSizeBytes, err := ca.DetermineBlockSize(func(input []byte) ([]byte, err) { return getEncryptedProfile(string(input)) })
+	if err != nil {
+		panic("couldn't determine block size")
+	}
 
-	fmt.Printf("map: %v\n", myMap)
+	fmt.Printf("blockSizeBytes: %v\n", blockSizeBytes)
+
+	cipher, err := getEncryptedProfile("testemail@mydomain.com")
+	if err != nil {
+		panic("getEncryptedProfile error")
+	}
 }
