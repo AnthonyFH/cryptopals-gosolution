@@ -104,7 +104,7 @@ func getEncryptedProfile(profile string) ([]byte, error) {
 
 func main() {
 	// TODO undefined: err (say what?!)
-	blockSizeBytes, err := ca.DetermineBlockSize(func(input []byte) ([]byte, err) { return getEncryptedProfile(string(input)) })
+	blockSizeBytes, err := ca.DetermineBlockSize(func(input []byte) ([]byte, error) { return getEncryptedProfile(string(input)) })
 	if err != nil {
 		panic("couldn't determine block size")
 	}
@@ -115,4 +115,6 @@ func main() {
 	if err != nil {
 		panic("getEncryptedProfile error")
 	}
+
+	fmt.Printf("cipher: %v\n", cipher)
 }
