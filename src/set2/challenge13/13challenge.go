@@ -70,25 +70,33 @@ func profileFor(email string) (string, error) {
 	}
 
 	profile["email"] = email
-	profile["id"] = "10"
+	profile["uid"] = "10"
 	profile["role"] = "user"
 
 	var resultBuilder strings.Builder
 	resultBuilder.Reset()
 
-	for property, value := range profile {
+	// Properties are not iterated through in a deterministic order we need to hardcode the order
+	// email
+	for i := 0; i < 3; i++ {
+		var property string
+		switch i {
+		case 0:
+			property = "email"
+		case 1:
+			property = "uid"
+		case 2:
+			property = "role"
+		}
 		resultBuilder.WriteString(property)
 		resultBuilder.WriteString("=")
-		resultBuilder.WriteString(value)
+		resultBuilder.WriteString(profile[property])
 		resultBuilder.WriteString("&")
 	}
 
 	result := resultBuilder.String()
 
 	result = strings.TrimSuffix(result, "&")
-
-	// TODO remove
-	fmt.Printf("profileString: %v\n", result)
 
 	return result, nil
 }
@@ -147,7 +155,7 @@ func main() {
 	// We want some cipher that has "user" by itself in a block so that we can
 	// paste on top of that.
 	prependSize := 6 // length of "email="
-	appendSize := 12 // length of "&id=10&role="
+	appendSize := 13 // length of "&uid=10&role="
 	//userSize := 4    // length of "user"
 
 	pasteEmailSize := (blockSizeBytes - prependSize - appendSize) % blockSizeBytes // the email we'll use for the final "attack" profile
