@@ -1,0 +1,1 @@
+Challenge 15 is already solved by the RemovePadding function in the cryptohelpers package
