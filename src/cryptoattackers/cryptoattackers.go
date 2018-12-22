@@ -2,6 +2,7 @@ package cryptoattackers
 
 import (
 	"errors"
+	"fmt"
 )
 
 // DetermineBlockSize will return the blocksize of some encryption func which takes in a []byte.
@@ -16,7 +17,7 @@ func DetermineBlockSize(encryptionFunc func([]byte) ([]byte, error)) (int, error
 
 	cipherTextBytes, err := encryptionFunc(plainTextBytes)
 	if err != nil {
-		return -1, errors.New("encryptionFunc invocation error")
+		return -1, fmt.Errorf("encryptionFunc invocation error: %v", err)
 	}
 
 	// Loop until the output changes size twice
