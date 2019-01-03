@@ -48,8 +48,21 @@ func EncryptAESCBC(key []byte, iv []byte, message []byte) ([]byte, error) {
 }
 
 // DecryptAESCBC decrypts messages using AES with the given key using CBC
-// mode with the given initialization vector (iv)
+// mode with the given initialization vector (iv).
 func DecryptAESCBC(key []byte, iv []byte, encryptedMessage []byte) ([]byte, error) {
+	return decryptAESCBCInternal(key, iv, encryptedMessage, true)
+}
+
+// DecryptAESCBCLeavePadding decrypts messages using AES with the given key using CBC
+// mode with the given initialization vector (iv). It does not strip any padding from
+// the raw unencrypted plaintext.
+func DecryptAESCBCLeavePadding(key []byte, iv []byte, encryptedMessage []byte) ([]byte, error) {
+	return decryptAESCBCInternal(key, iv, encryptedMessage, false)
+}
+
+// decryptAESCBCInternal decrypts messages using AES with the given key using CBC
+// mode with the given initialization vector (iv). It optionally strips the padding.
+func decryptAESCBCInternal(key []byte, iv []byte, encryptedMessage []byte, doRemovePadding bool) ([]byte, error) {
 	aesBlock, err := aes.NewCipher(key)
 	if err != nil {
 		return nil, err
@@ -86,9 +99,11 @@ func DecryptAESCBC(key []byte, iv []byte, encryptedMessage []byte) ([]byte, erro
 		decryptedMessage = append(decryptedMessage, blockOutput...)
 	}
 
-	decryptedMessage, err = RemovePadding(decryptedMessage)
-	if err != nil {
-		return nil, err
+	if doRemovePadding {
+		decryptedMessage, err = RemovePadding(decryptedMessage)
+		if err != nil {
+			return nil, err
+		}
 	}
 
 	return decryptedMessage, nil
@@ -170,6 +185,10 @@ func AppendPadding(message []byte, blockSize int) ([]byte, error) {
 // padding as defined in RFC 2315
 func RemovePadding(message []byte) ([]byte, error) {
 	paddingBytes := int(message[len(message)-1])
+
+	if paddingBytes == 0 {
+		return nil, errors.New("Inavlid padding")
+	}
 
 	for i := 1; i <= paddingBytes; i++ {
 		if i == len(message) || message[len(message)-i] != byte(paddingBytes) {
