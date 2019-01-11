@@ -4,6 +4,7 @@ import (
 	"crypto/rand"
 	ch "cryptohelpers"
 	"encoding/base64"
+	"errors"
 	"fmt"
 	"io/ioutil"
 	"os"
@@ -14,10 +15,10 @@ var superSecretKey []byte
 var iv = []byte("\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00")
 var blockSizeBytes = 16
 
-// encryptRandomPayload reads the strings in challengetext.txt,
-// picks one at random, and then encrypts it under a random key
+// encryptPayload reads the strings in challengetext.txt,
+// picks the one at the given index, and then encrypts it under a random key
 // using AES-128-CBC
-func encryptRandomPayload() ([]byte, error) {
+func encryptPayload(index int) ([]byte, error) {
 	filename := "challengetext.txt"
 
 	file, err := os.Open(filename)
@@ -45,10 +46,11 @@ func encryptRandomPayload() ([]byte, error) {
 		rand.Read(superSecretKey)
 	}
 
-	randomByteSlice := make([]byte, 1)
-	rand.Read(randomByteSlice)
+	if index > len(messageList) || index < 0 {
+		return nil, errors.New("index out of range")
+	}
 
-	return ch.EncryptAESCBC(superSecretKey, iv, messageList[int(randomByteSlice[0])%len(messageList)])
+	return ch.EncryptAESCBC(superSecretKey, iv, messageList[index])
 }
 
 // decryptPayloadAndCheckPadding decrypts the given cipher
@@ -69,11 +71,12 @@ func decryptPayloadAndCheckPadding(cipher []byte) (bool, error) {
 	return true, nil
 }
 
+// decryptSingleByte decrypts the last block of cipherData by using access
+// to a padding oracle.
 func decryptSingleByte(cipherData []byte) ([]byte, error) {
 
-	// TODO:
-	// - for now assuming that cipherData is at least two blocks large
-	// - don't worry about edge cases where valid padding is because of 2's or 3's and so on
+	// NOTE: This function assumes that the cipherData is at least
+	// two blocks large. Prepend the iv to the first block to use this function.
 
 	// Take two blocks at the end of the cipher,
 	// Then XOR the last byte by a known value until we have valid padding.
@@ -88,8 +91,8 @@ func decryptSingleByte(cipherData []byte) ([]byte, error) {
 	decryptedBlock := make([]byte, 16)
 
 	for i := 1; i <= blockSizeBytes; i++ {
-		// TODO handle when there is no match here and the last byte is already \x01
-		for j := 1; j < 256; j++ {
+		j := 0
+		for j = 1; j < 256; j++ {
 			cipherData[len(cipherData)-blockSizeBytes-i] ^= byte(j)
 			validPadding, err := decryptPayloadAndCheckPadding(cipherData)
 			if err != nil {
@@ -100,8 +103,6 @@ func decryptSingleByte(cipherData []byte) ([]byte, error) {
 				decryptedBlock[blockSizeBytes-i] = byte(i) ^ byte(j)
 				// Set all the ending bytes to the next attack value
 				for k := 1; k <= i; k++ {
-					// TODO TODO, was working here and it's mostly working, but we always
-					// get back a decrypted block that has one less padding value than it should (e.g. 4 4 4)
 					cipherData[len(cipherData)-blockSizeBytes-k] ^= byte(i) ^ byte(i+1)
 				}
 
@@ -110,23 +111,56 @@ func decryptSingleByte(cipherData []byte) ([]byte, error) {
 			// Put our modified byte back
 			cipherData[len(cipherData)-blockSizeBytes-i] ^= byte(j)
 		}
+		if j == 256 {
+			decryptedBlock[blockSizeBytes-i] = byte(i)
+			// Set all the ending bytes to the next attack value
+			for k := 1; k <= i; k++ {
+				cipherData[len(cipherData)-blockSizeBytes-k] ^= byte(i) ^ byte(i+1)
+			}
+		}
+
 	}
 
 	return decryptedBlock, nil
 }
 
+func decryptCipherUserPaddingOracle(cipherData []byte) ([]byte, error) {
+	var plaintext []byte
+	numBlocks := len(cipherData) / blockSizeBytes
+
+	// Prepend the iv so we can decrypt the first block by modifying it
+	cipherData = append(iv, cipherData...)
+
+	for i := 0; i < numBlocks; i++ {
+		cipherDataCopy := make([]byte, len(cipherData))
+		copy(cipherDataCopy, cipherData)
+		decryptedBlock, err := decryptSingleByte(cipherDataCopy[:len(cipherDataCopy)-(i*blockSizeBytes)])
+		if err != nil {
+			return nil, fmt.Errorf("decryption error: %v", err)
+		}
+		plaintext = append(decryptedBlock, plaintext...)
+	}
+
+	return plaintext, nil
+}
+
 func main() {
-	cipherData, err := encryptRandomPayload()
-	if err != nil {
-		panic("encryptRandomPayload error")
-	}
+	for i := 0; i < 10; i++ {
+		cipherData, err := encryptPayload(i)
+		if err != nil {
+			panic("encryptRandomPayload error")
+		}
 
-	// TODO call this correctly to get the whole thing
-	decryptedBlock, err := decryptSingleByte(cipherData)
-	if err != nil {
-		panic("decryptionerror")
-	}
+		plaintext, err := decryptCipherUserPaddingOracle(cipherData)
+		if err != nil {
+			panic("decryption error")
+		}
 
-	fmt.Printf("decryptedBlock: %v\n", decryptedBlock)
-	fmt.Printf("decryptedBlock string: %v\n", string(decryptedBlock))
+		fmt.Printf("plaintext at index %v: %v\n", i, plaintext)
+		plaintext, err = ch.RemovePadding(plaintext)
+		if err != nil {
+			panic("padding error")
+		}
+		fmt.Printf("plaintext string at index %v: %v\n\n\n", i, string(plaintext))
+	}
 }
