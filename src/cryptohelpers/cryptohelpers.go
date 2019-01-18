@@ -168,6 +168,68 @@ func EncryptAESECB(key []byte, message []byte) ([]byte, error) {
 	return cipher, nil
 }
 
+// EncryptDecryptAESCTR encrypts and decrypts messages using
+// AES with the given key and CTR mode with the given nonce.
+// The format of the counter is nonce || count where both nonce and count
+// are 64 bits and little-endian.
+func EncryptDecryptAESCTR(key []byte, nonce []byte, message []byte) ([]byte, error) {
+	// TODO? rename function and message variable to show this function is for both encryption and decryption
+	aesBlock, err := aes.NewCipher(key)
+	if err != nil {
+		return nil, err
+	}
+
+	blockSizeBytes := aesBlock.BlockSize()
+
+	if len(nonce) != blockSizeBytes/2 {
+		return nil, errors.New("Nonce has incorrect length")
+	}
+
+	encryptedMessage := make([]byte, 0, len(message))
+
+	// Initialize the counter
+	counterInput := make([]byte, 0)
+	// Start with the nonce
+	for j := 1; j <= blockSizeBytes/2; j++ {
+		counterInput = append(counterInput, nonce[len(nonce)-j])
+	}
+	// Then add the count, initialized to 0
+	for j := 0; j <= blockSizeBytes/2; j++ {
+		counterInput = append(counterInput, byte(0))
+	}
+
+	for i := 0; i < len(message); i += blockSizeBytes {
+		xorBlock := make([]byte, blockSizeBytes)
+
+		aesBlock.Encrypt(xorBlock, counterInput)
+
+		// Either xor a full block or the rest of the message if we're at the end
+		xorSize := blockSizeBytes
+		if blockSizeBytes > (len(message) - i) {
+			xorSize = len(message) - i
+		}
+		xorOutput, err := FixedXor(message[i:i+xorSize], xorBlock[0:xorSize])
+		if err != nil {
+			return nil, fmt.Errorf("xor error: %v", err)
+		}
+
+		encryptedMessage = append(encryptedMessage, xorOutput...)
+
+		// Increment count
+		for j := 0; j < blockSizeBytes/2; j++ {
+			currentIndex := (blockSizeBytes / 2) + j
+			// Increment the first block of the counter
+			counterInput[currentIndex] = counterInput[currentIndex] + 1
+			// If the byte is not 0, no need to continue and carry over the addition
+			if counterInput[currentIndex] != 0 {
+				break
+			}
+		}
+	}
+
+	return encryptedMessage, nil
+}
+
 // AppendPadding takes a byte slice and a block size returns a byte slice with
 // appended padding so that its length is an even multiple of the block size
 func AppendPadding(message []byte, blockSize int) ([]byte, error) {
